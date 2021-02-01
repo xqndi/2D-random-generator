@@ -1,8 +1,12 @@
 from graphics import *
 from random import randint
 
+
 WINDOW_WIDTH = 1080
 WINDOW_HEIGHT = 720
+
+X_CENTER = WINDOW_WIDTH / 2
+Y_CENTER = WINDOW_HEIGHT / 2
 
 
 class House(Rectangle):
@@ -63,7 +67,52 @@ class House(Rectangle):
                     (0 <= temp_y - index <= WINDOW_HEIGHT - 1) and \
                     (win_map[temp_y - index][temp_x + index] == 1):
                 self.nr_living_neighbors += 1
-        print(self.nr_living_neighbors)
+
+
+class Tree(Point):
+    def __init__(self, x_pos, y_pos):
+        self.nr_living_neighbors = 0
+        self.dist_center = -1
+        Point.__init__(self, x_pos, y_pos)
+        self.setFill("greenyellow")
+
+    def update_map_(self, win_map, window):
+        temp_y = int(self.getY())
+        temp_x = int(self.getX())
+
+        if not win_map[temp_y][temp_x]:
+            win_map[temp_y][temp_x] = 3
+            self.draw(window)
+            return True
+        return False
+
+    def count_neighbors_(self, win_map, neighbor_size):
+        temp_y = int(self.getY())
+        temp_x = int(self.getX())
+
+        for index in range(-neighbor_size, neighbor_size + 1):
+            if index == 0:
+                continue
+            if (0 <= temp_y + index <= WINDOW_HEIGHT - 1) and \
+                    (win_map[temp_y + index][temp_x] == 3):
+                self.nr_living_neighbors += 1
+            if (0 <= temp_x + index <= WINDOW_WIDTH - 1) and \
+                    (win_map[temp_y][temp_x + index] == 3):
+                self.nr_living_neighbors += 1
+            if (0 <= temp_x + index <= WINDOW_WIDTH - 1) and \
+                    (0 <= temp_y + index <= WINDOW_HEIGHT - 1) and \
+                    (win_map[temp_y + index][temp_x + index] == 3):
+                self.nr_living_neighbors += 1
+            if (0 <= temp_x + index <= WINDOW_WIDTH - 1) and \
+                    (0 <= temp_y - index <= WINDOW_HEIGHT - 1) and \
+                    (win_map[temp_y - index][temp_x + index] == 3):
+                self.nr_living_neighbors += 1
+
+    def distance_to_center(self):
+        x_dist = abs(self.getX() - X_CENTER)
+        y_dist = abs(self.getY() - Y_CENTER)
+
+        self.dist_center = x_dist + y_dist
 
 
 class Lake(Circle):
@@ -72,13 +121,11 @@ class Lake(Circle):
         self.setFill("blue")
         self.setOutline("blue")
 
-    def update_map_(self, win_map):
-
+    def update_map_(self, win_map, window):
         low_x = int(self.getP1().getX())
         low_y = int(self.getP1().getY())
         high_x = int(self.getP2().getX())
         high_y = int(self.getP2().getY())
-        print(low_x, low_y, high_x, high_y)
 
         for row_y in range(low_y, high_y + 1):
             for col_x in range(low_x, high_x + 1):
@@ -89,6 +136,8 @@ class Lake(Circle):
                 if win_map[row_y][col_x]:
                     return False
 
+        self.draw(window)
+
         for row_y in range(low_y, high_y + 1):
             for col_x in range(low_x, high_x + 1):
                 if not (0 <= row_y <= WINDOW_HEIGHT - 1):
@@ -96,7 +145,21 @@ class Lake(Circle):
                 if not (0 <= col_x <= WINDOW_WIDTH - 1):
                     continue
                 win_map[row_y][col_x] = 2
+                self.fill_surroundings(window, row_y, col_x)
         return True
+
+    def fill_surroundings(self, window, row_y, col_x):
+        x_dist = abs(self.getCenter().getX() - col_x)
+        y_dist = abs(self.getCenter().getY() - row_y)
+        total_dist = x_dist + y_dist
+        modifier = int(self.radius / 3)
+
+        if x_dist * x_dist + y_dist * y_dist < self.radius * self.radius:
+            return
+        if randint(0, total_dist * modifier) > self.radius:
+            return
+
+        window.plot(col_x, row_y, "blue")
 
 
 def generate_houses(win_map, nr_houses, window, neighbor_size):
@@ -107,13 +170,32 @@ def generate_houses(win_map, nr_houses, window, neighbor_size):
             temp_house.count_neighbors_(win_map, neighbor_size)
 
             if temp_house.nr_living_neighbors == 0 and \
-                    randint(0, 20 * neighbor_size) != 0:
+                    randint(0, 10 * neighbor_size) != 0:
                 break
-            spawn_threshold = randint(0, int(neighbor_size / 3))
+            spawn_threshold = randint(0, int(neighbor_size / 5))
             if temp_house.nr_living_neighbors < spawn_threshold:
                 break
             if temp_house.update_map_(win_map):
                 temp_house.draw(window)
+                break
+
+
+def generate_trees(win_map, nr_trees, window, neighbor_size):
+    for tree in range(nr_trees):
+        while True:
+            temp_tree = Tree(randint(0, WINDOW_WIDTH - 10), randint(0, WINDOW_HEIGHT - 10))
+            temp_tree.distance_to_center()
+            if temp_tree.dist_center < randint(100, WINDOW_HEIGHT - 50):
+                break
+            temp_tree.count_neighbors_(win_map, neighbor_size)
+
+            if temp_tree.nr_living_neighbors == 0 and \
+                    randint(0, 20 * neighbor_size) != 0:
+                break
+            spawn_threshold = randint(0, int(neighbor_size / 20))
+            if temp_tree.nr_living_neighbors < spawn_threshold:
+                break
+            if temp_tree.update_map_(win_map, window):
                 break
 
 
@@ -123,10 +205,8 @@ def generate_lakes(win_map, nr_iterations, window):
             continue
         temp_lake = Lake(Point(randint(0, WINDOW_WIDTH - 10),
                                randint(0, WINDOW_HEIGHT - 10)), randint(40, 100))
-        if not temp_lake.update_map_(win_map):
+        if not temp_lake.update_map_(win_map, window):
             continue
-        temp_lake.draw(window)
-        # Rectangle(temp_lake.getP1(), temp_lake.getP2()).draw(window)
 
 
 def main():
@@ -134,11 +214,11 @@ def main():
                   for row in range(WINDOW_HEIGHT)]
 
     win = GraphWin("gen", WINDOW_WIDTH, WINDOW_HEIGHT)
-    win.setBackground("olivedrab")
+    win.setBackground("green")
 
     generate_lakes(window_map, 5, win)
-    generate_houses(window_map, 45000, win, 30)
-
+    generate_trees(window_map, 70000, win, 20)
+    generate_houses(window_map, 25000, win, 20)
     win.getMouse()
 
 
