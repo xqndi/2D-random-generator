@@ -162,6 +162,51 @@ class Lake(Circle):
         window.plot(col_x, row_y, "blue")
 
 
+class RiverPart(Rectangle):
+    def __init__(self, top_corner):
+        self.size = 10
+        self.inside_win = True
+        Rectangle.__init__(self, top_corner, Point(top_corner.getX() + self.size,
+                                                   top_corner.getY() + self.size))
+        self.setOutline("blue")
+        self.setFill("blue")
+
+    def update_map_(self, win_map, window):
+        low_x = int(self.getP1().getX())
+        low_y = int(self.getP1().getY())
+        high_x = int(self.getP2().getX())
+        high_y = int(self.getP2().getY())
+
+        is_valid = True
+
+        for row_y in range(low_y, high_y + 1):
+            for col_x in range(low_x, high_x + 1):
+                if not (0 <= row_y <= WINDOW_HEIGHT - 1):
+                    continue
+                if not (0 <= col_x <= WINDOW_WIDTH - 1):
+                    continue
+                if win_map[row_y][col_x]:
+                    is_valid = False
+
+        if not is_valid:
+            return
+
+        self.draw(window)
+
+        for row_y in range(low_y, high_y + 1):
+            for col_x in range(low_x, high_x + 1):
+                if not (0 <= row_y <= WINDOW_HEIGHT - 1):
+                    self.inside_win = False
+                    break
+                if not (0 <= col_x <= WINDOW_WIDTH - 1):
+                    self.inside_win = False
+                    break
+                win_map[row_y][col_x] = 4
+
+        if not self.inside_win:
+            print("not inside")
+
+
 def generate_houses(win_map, nr_houses, window, neighbor_size):
     for house in range(nr_houses):
         while True:
@@ -209,6 +254,41 @@ def generate_lakes(win_map, nr_iterations, window):
             continue
 
 
+def manage_river(win_map, nr_iterations, window, spawn_rate):
+    for iteration in range(nr_iterations):
+        if spawn_rate < randint(0, 100):
+            continue
+        generate_river(win_map, window)
+
+
+def generate_river(win_map, window):
+    river = RiverPart(Point(randint(0, WINDOW_WIDTH - 10),
+                            randint(0, WINDOW_HEIGHT - 10)))
+    river.update_map_(win_map, window)
+
+    last_corner = river.clone().getP1()
+    while True:
+        direction = randint(1, 4)
+
+        if direction == 1:
+            temp_river = RiverPart(Point(last_corner.getX() + 11,
+                                         last_corner.getY()))
+        elif direction == 2:
+            temp_river = RiverPart(Point(last_corner.getX(),
+                                         last_corner.getY() + 11))
+        elif direction == 3:
+            temp_river = RiverPart(Point(last_corner.getX() - 11,
+                                         last_corner.getY()))
+        elif direction == 4:
+            temp_river = RiverPart(Point(last_corner.getX(),
+                                         last_corner.getY() - 11))
+
+        temp_river.update_map_(win_map, window)
+        last_corner = temp_river.clone().getP1()
+        if not temp_river.inside_win:
+            break
+
+
 def main():
     window_map = [[0 for col in range(WINDOW_WIDTH)]
                   for row in range(WINDOW_HEIGHT)]
@@ -216,9 +296,9 @@ def main():
     win = GraphWin("gen", WINDOW_WIDTH, WINDOW_HEIGHT)
     win.setBackground("green")
 
-    generate_lakes(window_map, 5, win)
-    generate_trees(window_map, 70000, win, 20)
-    generate_houses(window_map, 25000, win, 20)
+    manage_river(window_map, 8, win, 80)
+    generate_trees(window_map, 100000, win, 20)
+    generate_houses(window_map, 15000, win, 20)
     win.getMouse()
 
 
