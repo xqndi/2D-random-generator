@@ -1,3 +1,4 @@
+import json
 from graphics import *
 from random import randint
 
@@ -7,6 +8,97 @@ WINDOW_HEIGHT = 720
 
 X_CENTER = WINDOW_WIDTH / 2
 Y_CENTER = WINDOW_HEIGHT / 2
+
+
+def main():
+    surnames_list = []
+    male_names_list = []
+    female_names_list = []
+
+    parse_json_files(surnames_list, male_names_list, female_names_list)
+
+    window_map = [[0 for col in range(WINDOW_WIDTH)]
+                  for row in range(WINDOW_HEIGHT)]
+
+    win = GraphWin("gen", WINDOW_WIDTH, WINDOW_HEIGHT)
+    win.setBackground("green")
+
+    manage_river(window_map, 8, win, 80)
+    generate_trees(window_map, 100000, win, 20)
+    generate_houses(window_map, 15000, win, 20)
+    win.getMouse()
+
+
+def parse_json_files(surnames_list, male_names_list, female_names_list):
+    Surnames_file = open('babynames/Surnames.json')
+    Babynames_file = open('babynames/Names.json')
+
+    Surname_data = json.load(Surnames_file)
+    for name in Surname_data:
+        surnames_list.append(name["surname"])
+    Surnames_file.close()
+
+    Babyname_data = json.load(Babynames_file)
+
+    name_index = 0
+    for name in Babyname_data:
+        if name_index % 2 == 0:
+            male_names_list.append(name["name"])
+        else:
+            female_names_list.append(name["name"])
+
+        name_index += 1
+
+    male_names_list.pop()
+    Babynames_file.close()
+
+    print(surnames_list)
+    print(female_names_list)
+    print(male_names_list)
+
+
+class Tree(Point):
+    def __init__(self, x_pos, y_pos):
+        self.nr_living_neighbors = 0
+        self.dist_center = -1
+
+        Point.__init__(self, x_pos, y_pos)
+        self.setFill("greenyellow")
+        self.temp_y = int(self.getY())
+        self.temp_x = int(self.getX())
+
+    def update_map_(self, win_map, window):
+        if not win_map[self.temp_y][self.temp_x]:
+            win_map[self.temp_y][self.temp_x] = 3
+            self.draw(window)
+            return True
+        return False
+
+    def count_neighbors_(self, win_map, neighbor_size):
+
+        for index in range(-neighbor_size, neighbor_size + 1):
+            if index == 0:
+                continue
+            if (0 <= self.temp_y + index <= WINDOW_HEIGHT - 1) and \
+                    (win_map[self.temp_y + index][self.temp_x] == 3):
+                self.nr_living_neighbors += 1
+            if (0 <= self.temp_x + index <= WINDOW_WIDTH - 1) and \
+                    (win_map[self.temp_y][self.temp_x + index] == 3):
+                self.nr_living_neighbors += 1
+            if (0 <= self.temp_x + index <= WINDOW_WIDTH - 1) and \
+                    (0 <= self.temp_y + index <= WINDOW_HEIGHT - 1) and \
+                    (win_map[self.temp_y + index][self.temp_x + index] == 3):
+                self.nr_living_neighbors += 1
+            if (0 <= self.temp_x + index <= WINDOW_WIDTH - 1) and \
+                    (0 <= self.temp_y - index <= WINDOW_HEIGHT - 1) and \
+                    (win_map[self.temp_y - index][self.temp_x + index] == 3):
+                self.nr_living_neighbors += 1
+
+    def distance_to_center(self):
+        x_dist = abs(self.getX() - X_CENTER)
+        y_dist = abs(self.getY() - Y_CENTER)
+
+        self.dist_center = x_dist + y_dist
 
 
 class House(Rectangle):
@@ -19,102 +111,55 @@ class House(Rectangle):
         Rectangle.__init__(self, self.upper_corner, self.lower_corner)
         self.setFill("black")
         self.setOutline("black")
+        self.temp_y = int(self.upper_corner.getY())
+        self.temp_x = int(self.upper_corner.getX())
 
     def update_map_(self, win_map):
-        temp_y = int(self.upper_corner.getY())
-        temp_x = int(self.upper_corner.getX())
 
-        if not win_map[temp_y][temp_x]:
-            win_map[temp_y][temp_x] = 1
+        if not win_map[self.temp_y][self.temp_x]:
+            win_map[self.temp_y][self.temp_x] = 1
         else:
             return False
 
-        if not win_map[temp_y + 1][temp_x]:
-            win_map[temp_y + 1][temp_x] = 1
+        if not win_map[self.temp_y + 1][self.temp_x]:
+            win_map[self.temp_y + 1][self.temp_x] = 1
         else:
             return False
 
-        if not win_map[temp_y][temp_x + 1]:
-            win_map[temp_y][temp_x + 1] = 1
+        if not win_map[self.temp_y][self.temp_x + 1]:
+            win_map[self.temp_y][self.temp_x + 1] = 1
         else:
             return False
 
-        if not win_map[temp_y + 1][temp_x + 1]:
-            win_map[temp_y + 1][temp_x + 1] = 1
+        if not win_map[self.temp_y + 1][self.temp_x + 1]:
+            win_map[self.temp_y + 1][self.temp_x + 1] = 1
         else:
             return False
 
         return True
 
     def count_neighbors_(self, win_map, neighbor_size):
-        temp_y = int(self.upper_corner.getY())
-        temp_x = int(self.upper_corner.getX())
 
         for index in range(-neighbor_size, neighbor_size + 2):
             if index == 0:
                 continue
-            if (0 <= temp_y + index <= WINDOW_HEIGHT - 1) and \
-                    (win_map[temp_y + index][temp_x] == 1):
+            if (0 <= self.temp_y + index <= WINDOW_HEIGHT - 1) and \
+                    (win_map[self.temp_y + index][self.temp_x] == 1):
                 self.nr_living_neighbors += 1
-            if (0 <= temp_x + index <= WINDOW_WIDTH - 1) and \
-                    (win_map[temp_y][temp_x + index] == 1):
+            if (0 <= self.temp_x + index <= WINDOW_WIDTH - 1) and \
+                    (win_map[self.temp_y][self.temp_x + index] == 1):
                 self.nr_living_neighbors += 1
-            if (0 <= temp_x + index <= WINDOW_WIDTH - 1) and \
-                    (0 <= temp_y + index <= WINDOW_HEIGHT - 1) and \
-                    (win_map[temp_y + index][temp_x + index] == 1):
+            if (0 <= self.temp_x + index <= WINDOW_WIDTH - 1) and \
+                    (0 <= self.temp_y + index <= WINDOW_HEIGHT - 1) and \
+                    (win_map[self.temp_y + index][self.temp_x + index] == 1):
                 self.nr_living_neighbors += 1
-            if (0 <= temp_x + index <= WINDOW_WIDTH - 1) and \
-                    (0 <= temp_y - index <= WINDOW_HEIGHT - 1) and \
-                    (win_map[temp_y - index][temp_x + index] == 1):
-                self.nr_living_neighbors += 1
-
-
-class Tree(Point):
-    def __init__(self, x_pos, y_pos):
-        self.nr_living_neighbors = 0
-        self.dist_center = -1
-        Point.__init__(self, x_pos, y_pos)
-        self.setFill("greenyellow")
-
-    def update_map_(self, win_map, window):
-        temp_y = int(self.getY())
-        temp_x = int(self.getX())
-
-        if not win_map[temp_y][temp_x]:
-            win_map[temp_y][temp_x] = 3
-            self.draw(window)
-            return True
-        return False
-
-    def count_neighbors_(self, win_map, neighbor_size):
-        temp_y = int(self.getY())
-        temp_x = int(self.getX())
-
-        for index in range(-neighbor_size, neighbor_size + 1):
-            if index == 0:
-                continue
-            if (0 <= temp_y + index <= WINDOW_HEIGHT - 1) and \
-                    (win_map[temp_y + index][temp_x] == 3):
-                self.nr_living_neighbors += 1
-            if (0 <= temp_x + index <= WINDOW_WIDTH - 1) and \
-                    (win_map[temp_y][temp_x + index] == 3):
-                self.nr_living_neighbors += 1
-            if (0 <= temp_x + index <= WINDOW_WIDTH - 1) and \
-                    (0 <= temp_y + index <= WINDOW_HEIGHT - 1) and \
-                    (win_map[temp_y + index][temp_x + index] == 3):
-                self.nr_living_neighbors += 1
-            if (0 <= temp_x + index <= WINDOW_WIDTH - 1) and \
-                    (0 <= temp_y - index <= WINDOW_HEIGHT - 1) and \
-                    (win_map[temp_y - index][temp_x + index] == 3):
+            if (0 <= self.temp_x + index <= WINDOW_WIDTH - 1) and \
+                    (0 <= self.temp_y - index <= WINDOW_HEIGHT - 1) and \
+                    (win_map[self.temp_y - index][self.temp_x + index] == 1):
                 self.nr_living_neighbors += 1
 
-    def distance_to_center(self):
-        x_dist = abs(self.getX() - X_CENTER)
-        y_dist = abs(self.getY() - Y_CENTER)
 
-        self.dist_center = x_dist + y_dist
-
-
+# ------ class currently not in use ------
 class Lake(Circle):
     def __init__(self, center, radius):
         Circle.__init__(self, center, radius)
@@ -203,9 +248,6 @@ class RiverPart(Rectangle):
                     break
                 win_map[row_y][col_x] = 4
 
-        if not self.inside_win:
-            print("not inside")
-
 
 def generate_houses(win_map, nr_houses, window, neighbor_size):
     for house in range(nr_houses):
@@ -269,6 +311,7 @@ def generate_river(win_map, window):
     last_corner = river.clone().getP1()
     while True:
         direction = randint(1, 4)
+        temp_river = -1
 
         if direction == 1:
             temp_river = RiverPart(Point(last_corner.getX() + 11,
@@ -287,19 +330,6 @@ def generate_river(win_map, window):
         last_corner = temp_river.clone().getP1()
         if not temp_river.inside_win:
             break
-
-
-def main():
-    window_map = [[0 for col in range(WINDOW_WIDTH)]
-                  for row in range(WINDOW_HEIGHT)]
-
-    win = GraphWin("gen", WINDOW_WIDTH, WINDOW_HEIGHT)
-    win.setBackground("green")
-
-    manage_river(window_map, 8, win, 80)
-    generate_trees(window_map, 100000, win, 20)
-    generate_houses(window_map, 15000, win, 20)
-    win.getMouse()
 
 
 if __name__ == '__main__':
