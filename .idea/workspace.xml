@@ -18,8 +18,30 @@
   <component name="PropertiesComponent">
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="restartRequiresConfirmation" value="false" />
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.main">
+    <configuration name="lakes_spider" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="2D-random-generator" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/babynames/babynames/spiders" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/babynames/babynames/spiders/lakes_spider.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="2D-random-generator" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -44,6 +66,7 @@
     <recent_temporary>
       <list>
         <item itemvalue="Python.main" />
+        <item itemvalue="Python.lakes_spider" />
       </list>
     </recent_temporary>
   </component>
@@ -59,21 +82,29 @@
     <servers />
   </component>
   <component name="WindowStateProjectService">
-    <state width="735" height="208" key="GridCell.Tab.0.bottom" timestamp="1612606422624">
+    <state width="737" height="183" key="GridCell.Tab.0.bottom" timestamp="1612727450666">
       <screen x="0" y="0" width="1536" height="824" />
     </state>
-    <state width="735" height="208" key="GridCell.Tab.0.bottom/0.0.1536.824@0.0.1536.824" timestamp="1612606422624" />
-    <state width="735" height="208" key="GridCell.Tab.0.center" timestamp="1612606422624">
+    <state width="737" height="183" key="GridCell.Tab.0.bottom/0.0.1536.824@0.0.1536.824" timestamp="1612727450666" />
+    <state width="737" height="183" key="GridCell.Tab.0.center" timestamp="1612727450666">
       <screen x="0" y="0" width="1536" height="824" />
     </state>
-    <state width="735" height="208" key="GridCell.Tab.0.center/0.0.1536.824@0.0.1536.824" timestamp="1612606422624" />
-    <state width="735" height="208" key="GridCell.Tab.0.left" timestamp="1612606422624">
+    <state width="737" height="183" key="GridCell.Tab.0.center/0.0.1536.824@0.0.1536.824" timestamp="1612727450666" />
+    <state width="737" height="183" key="GridCell.Tab.0.left" timestamp="1612727450666">
       <screen x="0" y="0" width="1536" height="824" />
     </state>
-    <state width="735" height="208" key="GridCell.Tab.0.left/0.0.1536.824@0.0.1536.824" timestamp="1612606422624" />
-    <state width="735" height="208" key="GridCell.Tab.0.right" timestamp="1612606422624">
+    <state width="737" height="183" key="GridCell.Tab.0.left/0.0.1536.824@0.0.1536.824" timestamp="1612727450666" />
+    <state width="737" height="183" key="GridCell.Tab.0.right" timestamp="1612727450666">
       <screen x="0" y="0" width="1536" height="824" />
     </state>
-    <state width="735" height="208" key="GridCell.Tab.0.right/0.0.1536.824@0.0.1536.824" timestamp="1612606422624" />
+    <state width="737" height="183" key="GridCell.Tab.0.right/0.0.1536.824@0.0.1536.824" timestamp="1612727450666" />
+    <state width="361" height="446" key="SwitcherDM" timestamp="1612683773085">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state width="361" height="446" key="SwitcherDM/0.0.1536.824@0.0.1536.824" timestamp="1612683773085" />
+    <state x="200" y="326" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2" timestamp="1612726349277">
+      <screen x="0" y="0" width="1536" height="824" />
+    </state>
+    <state x="200" y="326" key="com.intellij.openapi.vcs.update.UpdateOrStatusOptionsDialogupdate-v2/0.0.1536.824@0.0.1536.824" timestamp="1612726349277" />
   </component>
 </project>

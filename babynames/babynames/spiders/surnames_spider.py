@@ -32,5 +32,3 @@ class SurnamesSpider(scrapy.Spider):
             # get the first 50 name-pairs
             if iterator == 50:
                 return
-
-

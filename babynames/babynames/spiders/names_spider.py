@@ -16,4 +16,6 @@ class NamesSpider(scrapy.Spider):
                     is_name = False
             if is_name:
                 print(type(item))
-                yield {'name': item}
+                yield {
+                    'name': item
+                }
