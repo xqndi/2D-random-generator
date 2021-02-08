@@ -1,6 +1,9 @@
 import json
-from graphics import *
+from babynames.babynames.spiders import surnames_spider, names_spider, lakes_spider, lakesall_spider
+from scrapy.crawler import CrawlerProcess
+from pathlib import Path
 from random import randint
+from graphics import *
 
 
 WINDOW_WIDTH = 1080
@@ -9,20 +12,16 @@ WINDOW_HEIGHT = 720
 X_CENTER = WINDOW_WIDTH / 2
 Y_CENTER = WINDOW_HEIGHT / 2
 
-                                    # MAKE THEM LOCAL
-surnames_list = []
-male_names_list = []
-female_names_list = []
-
-lake_extras = ["Lake", "Lagoon", "Sea", "Pond"]
-lakes_list = []
-lake_dict = {}
-
 
 def main():
     house_list = []
+    surnames_list = []
+    male_names_list = []
+    female_names_list = []
+    lakes_list = []
+    lake_dict = {}
 
-    parse_json_files()
+    parse_json_files(surnames_list, male_names_list, female_names_list, lakes_list)
 
     window_map = [[0 for col in range(WINDOW_WIDTH)]
                   for row in range(WINDOW_HEIGHT)]
@@ -30,21 +29,22 @@ def main():
     win = GraphWin("gen", WINDOW_WIDTH, WINDOW_HEIGHT)
     win.setBackground("green")
 
-    manage_river(window_map, 9, win, 75)
-    generate_trees(window_map, 100000, win, 20)
-    generate_houses(window_map, 25000, win, 20, house_list)
+    RiverPart.manage_river(window_map, 9, win, 75, lake_dict, lakes_list)
+    Tree.generate_trees(window_map, 100000, win, 20)
+    House.generate_houses(window_map, 25000, win, 20, house_list,
+                          surnames_list, male_names_list, female_names_list)
 
     while True:
         mouse = win.getMouse()
         if not mouse:
             continue
         print(window_map[int(mouse.getY())][int(mouse.getX())])
-        check_houses(house_list, mouse, win)
-        check_lakes(mouse, window_map, win)
+        House.check_houses(house_list, mouse, win)
+        RiverPart.check_lakes(mouse, window_map, win, lake_dict)
 
 
 class Family:
-    def __init__(self):
+    def __init__(self, surnames_list, male_names_list, female_names_list):
         self.surname = surnames_list[randint(0, len(surnames_list) - 1)]
         self.names = []
         self.male_index_list = []
@@ -52,11 +52,11 @@ class Family:
 
         for it in range(randint(1, 5)):
             if randint(0, 1):
-                self.create_male()
+                self.create_male(male_names_list)
             else:
-                self.create_female()
+                self.create_female(female_names_list)
 
-    def create_female(self):
+    def create_female(self, female_names_list):
         valid_name = False
         while not valid_name:
             index = randint(0, 4)
@@ -75,7 +75,7 @@ class Family:
             self.female_index_list.append(index)
             return
 
-    def create_male(self):
+    def create_male(self, male_names_list):
         valid_name = False
         while not valid_name:
             index = randint(0, 4)
@@ -165,30 +165,30 @@ class Tree(Point):
         if self.dist_center > (WINDOW_HEIGHT - Y_CENTER):
             self.dist_center = WINDOW_HEIGHT - Y_CENTER
 
+    @staticmethod
+    def generate_trees(win_map, nr_trees, window, neighbor_size):
+        for tree in range(nr_trees):
+            while True:
+                temp_tree = Tree(randint(0, WINDOW_WIDTH - 10), randint(0, WINDOW_HEIGHT - 10))
+                temp_tree.distance_to_center()
+                if temp_tree.dist_center < randint(50, WINDOW_HEIGHT - 100):
+                    break
+                temp_tree.count_neighbors_(win_map, neighbor_size)
 
-def generate_trees(win_map, nr_trees, window, neighbor_size):
-    for tree in range(nr_trees):
-        while True:
-            temp_tree = Tree(randint(0, WINDOW_WIDTH - 10), randint(0, WINDOW_HEIGHT - 10))
-            temp_tree.distance_to_center()
-            if temp_tree.dist_center < randint(50, WINDOW_HEIGHT - 100):
-                break
-            temp_tree.count_neighbors_(win_map, neighbor_size)
-
-            if temp_tree.nr_living_neighbors == 0 and \
-                    randint(0, 20 * neighbor_size) != 0:
-                break
-            spawn_threshold = randint(0, int(neighbor_size / 20))
-            if temp_tree.nr_living_neighbors < spawn_threshold:
-                break
-            if temp_tree.update_map_(win_map, window):
-                break
+                if temp_tree.nr_living_neighbors == 0 and \
+                        randint(0, 20 * neighbor_size) != 0:
+                    break
+                spawn_threshold = randint(0, int(neighbor_size / 20))
+                if temp_tree.nr_living_neighbors < spawn_threshold:
+                    break
+                if temp_tree.update_map_(win_map, window):
+                    break
 
 
 class House(Rectangle):
-    def __init__(self, top_corner):
+    def __init__(self, top_corner, surnames_list, male_names_list, female_names_list):
         self.size = 1
-        self.family = Family()
+        self.family = Family(surnames_list, male_names_list, female_names_list)
         self.nr_living_neighbors = 0
         self.upper_corner = top_corner
         self.lower_corner = Point(top_corner.getX() + self.size,
@@ -243,47 +243,49 @@ class House(Rectangle):
                     (win_map[self.temp_y - index][self.temp_x + index] == 1):
                 self.nr_living_neighbors += 1
 
+    @staticmethod
+    def generate_houses(win_map, nr_houses, window, neighbor_size, houses_list,
+                        surnames_list, male_names_list, female_names_list):
+        for house in range(nr_houses):
+            while True:
+                temp_house = House(Point(randint(0, WINDOW_WIDTH - 10),
+                                         randint(0, WINDOW_HEIGHT - 10)),
+                                   surnames_list, male_names_list, female_names_list)
+                temp_house.count_neighbors_(win_map, neighbor_size)
 
-def generate_houses(win_map, nr_houses, window, neighbor_size, houses_list):
-    for house in range(nr_houses):
-        while True:
-            temp_house = House(Point(randint(0, WINDOW_WIDTH - 10),
-                                     randint(0, WINDOW_HEIGHT - 10)))
-            temp_house.count_neighbors_(win_map, neighbor_size)
+                if temp_house.nr_living_neighbors == 0 and \
+                        randint(0, 10 * neighbor_size) != 0:
+                    break
+                spawn_threshold = randint(0, int(neighbor_size / 5))
+                if temp_house.nr_living_neighbors < spawn_threshold:
+                    break
+                if temp_house.update_map_(win_map):
+                    houses_list.append(temp_house)
+                    temp_house.draw(window)
+                    break
 
-            if temp_house.nr_living_neighbors == 0 and \
-                    randint(0, 10 * neighbor_size) != 0:
-                break
-            spawn_threshold = randint(0, int(neighbor_size / 5))
-            if temp_house.nr_living_neighbors < spawn_threshold:
-                break
-            if temp_house.update_map_(win_map):
-                houses_list.append(temp_house)
-                temp_house.draw(window)
-                break
+    @staticmethod
+    def check_houses(houses_list, mouse_point, graph_window):
+        mouse_x = mouse_point.getX()
+        mouse_y = mouse_point.getY()
 
+        for house in houses_list:
+            house_x = house.upper_corner.getX()
+            house_y = house.upper_corner.getY()
 
-def check_houses(houses_list, mouse_point, graph_window):
-    mouse_x = mouse_point.getX()
-    mouse_y = mouse_point.getY()
-
-    for house in houses_list:
-        house_x = house.upper_corner.getX()
-        house_y = house.upper_corner.getY()
-
-        for offset in range(-1, 2):
-            if (mouse_x + offset == house_x) and (mouse_y == house_y):
-                house.family.display_all(graph_window)
-                return
-            if (mouse_x + offset == house_x) and (mouse_y + offset == house_y):
-                house.family.display_all(graph_window)
-                return
-            if (mouse_x == house_x) and (mouse_y + offset == house_y):
-                house.family.display_all(graph_window)
-                return
-            if (mouse_x - offset == house_x) and (mouse_y + offset == house_y):
-                house.family.display_all(graph_window)
-                return
+            for offset in range(-1, 2):
+                if (mouse_x + offset == house_x) and (mouse_y == house_y):
+                    house.family.display_all(graph_window)
+                    return
+                if (mouse_x + offset == house_x) and (mouse_y + offset == house_y):
+                    house.family.display_all(graph_window)
+                    return
+                if (mouse_x == house_x) and (mouse_y + offset == house_y):
+                    house.family.display_all(graph_window)
+                    return
+                if (mouse_x - offset == house_x) and (mouse_y + offset == house_y):
+                    house.family.display_all(graph_window)
+                    return
 
 
 #       ---------- class currently not in use ----------
@@ -333,15 +335,15 @@ class Lake(Circle):
 
         window.plot(col_x, row_y, "blue")
 
-
-def generate_lakes(win_map, nr_iterations, window):
-    for attempt in range(nr_iterations):
-        if randint(0, 2):
-            continue
-        temp_lake = Lake(Point(randint(0, WINDOW_WIDTH - 10),
-                               randint(0, WINDOW_HEIGHT - 10)), randint(40, 100))
-        if not temp_lake.update_map_(win_map, window):
-            continue
+    @staticmethod
+    def generate_lakes(win_map, nr_iterations, window):
+        for attempt in range(nr_iterations):
+            if randint(0, 2):
+                continue
+            temp_lake = Lake(Point(randint(0, WINDOW_WIDTH - 10),
+                                   randint(0, WINDOW_HEIGHT - 10)), randint(40, 100))
+            if not temp_lake.update_map_(win_map, window):
+                continue
 
 
 class RiverPart(Rectangle):
@@ -386,91 +388,87 @@ class RiverPart(Rectangle):
                     break
                 win_map[row_y][col_x] = self.map_key
 
+    @staticmethod
+    def generate_river(win_map, window, map_key):
+        river = RiverPart(Point(randint(0, WINDOW_WIDTH - 10),
+                                randint(0, WINDOW_HEIGHT - 10)), map_key)
+        river.update_map_(win_map, window)
 
-def generate_river(win_map, window, map_key):
-    river = RiverPart(Point(randint(0, WINDOW_WIDTH - 10),
-                            randint(0, WINDOW_HEIGHT - 10)), map_key)
-    river.update_map_(win_map, window)
+        last_corner = river.clone().getP1()
+        while True:
+            direction = randint(1, 4)
+            temp_river = -1
 
-    last_corner = river.clone().getP1()
-    while True:
-        direction = randint(1, 4)
-        temp_river = -1
+            if direction == 1:
+                temp_river = RiverPart(Point(last_corner.getX() + 11,
+                                             last_corner.getY()), map_key)
+            elif direction == 2:
+                temp_river = RiverPart(Point(last_corner.getX(),
+                                             last_corner.getY() + 11), map_key)
+            elif direction == 3:
+                temp_river = RiverPart(Point(last_corner.getX() - 11,
+                                             last_corner.getY()), map_key)
+            elif direction == 4:
+                temp_river = RiverPart(Point(last_corner.getX(),
+                                             last_corner.getY() - 11), map_key)
 
-        if direction == 1:
-            temp_river = RiverPart(Point(last_corner.getX() + 11,
-                                         last_corner.getY()), map_key)
-        elif direction == 2:
-            temp_river = RiverPart(Point(last_corner.getX(),
-                                         last_corner.getY() + 11), map_key)
-        elif direction == 3:
-            temp_river = RiverPart(Point(last_corner.getX() - 11,
-                                         last_corner.getY()), map_key)
-        elif direction == 4:
-            temp_river = RiverPart(Point(last_corner.getX(),
-                                         last_corner.getY() - 11), map_key)
+            temp_river.update_map_(win_map, window)
+            last_corner = temp_river.clone().getP1()
+            if not temp_river.inside_win:
+                break
 
-        temp_river.update_map_(win_map, window)
-        last_corner = temp_river.clone().getP1()
-        if not temp_river.inside_win:
-            break
+    @staticmethod
+    def manage_river(win_map, nr_iterations, window, spawn_rate, lake_dict, lakes_list):
+        used_lake_indices = []
 
+        for iteration in range(nr_iterations):
+            if spawn_rate < randint(0, 100):
+                continue
+            RiverPart.create_lake_name(iteration + 4, used_lake_indices, lake_dict, lakes_list)
+            RiverPart.generate_river(win_map, window, iteration + 4)
 
-def manage_river(win_map, nr_iterations, window, spawn_rate):
-    used_lake_indices = []
+        print(used_lake_indices)
 
-    for iteration in range(nr_iterations):
-        if spawn_rate < randint(0, 100):
+    @staticmethod
+    def create_lake_name(key, used_lake_indices, lake_dict, lakes_list):
+        while True:
+            new_index = randint(0, len(lakes_list) - 1)
+            if new_index not in used_lake_indices:
+                break
+
+        name = lakes_list[new_index]
+        used_lake_indices.append(new_index)
+
+        lake_dict[str(key)] = name
+        print(lake_dict[str(key)])
+
+    @staticmethod
+    def check_lakes(mouse_point, win_map, graph_win, lake_dict):
+        key = win_map[int(mouse_point.getY())][int(mouse_point.getX())]
+        print("key: " + str(key))
+
+        if key < 4:
+            return
+        text = Entry(Point(118, 15), 25)
+
+        text.setText(lake_dict[str(key)])
+        text.setStyle("italic")
+        text.setFill("lightblue")
+        text.draw(graph_win)
+
+        # keep displaying while mouse is not not clicked
+        while not graph_win.getMouse():
             continue
-        create_lake_name(iteration + 4, used_lake_indices)
-        generate_river(win_map, window, iteration + 4)
 
-    print(used_lake_indices)
+        text.undraw()
 
 
-def create_lake_name(key, used_lake_indices):
-    while True:
-        new_index = randint(0, len(lakes_list) - 1)
-        if new_index not in used_lake_indices:
-            break
-
-    name = lakes_list[new_index]
-    used_lake_indices.append(new_index)
-
-    lake_title = randint(0, len(lake_extras) - 1)
-    if lake_title:
-        name = name + " " + lake_extras[lake_title]
-    else:
-        name = lake_extras[lake_title] + " " + name
-
-    lake_dict[str(key)] = name
-    print(lake_dict[str(key)])
-
-
-def check_lakes(mouse_point, win_map, graph_win):
-    key = win_map[int(mouse_point.getY())][int(mouse_point.getX())]
-    print("key: " + str(key))
-
-    if key < 4:
-        return
-    text = Entry(Point(118, 15), 25)
-
-    text.setText(lake_dict[str(key)])
-    text.setStyle("italic")
-    text.setFill("lightblue")
-    text.draw(graph_win)
-
-    # keep displaying while mouse is not not clicked
-    while not graph_win.getMouse():
-        continue
-
-    text.undraw()
-
-
-def parse_json_files():
+def parse_json_files(surnames_list, male_names_list, female_names_list, lakes_list):
+    run_spiders()
     Surnames_file = open('babynames/Surnames.json')
     Babynames_file = open('babynames/Names.json')
-    Lakenames_file = open('babynames/Lake_Names.json')
+    Texas_lakes_file = open('babynames/Lake_Names.json')
+    World_lakes_file = open('babynames/Lakes_All.json')
 
     Surname_data = json.load(Surnames_file)
 
@@ -491,15 +489,68 @@ def parse_json_files():
     male_names_list.pop()
     Babynames_file.close()
 
-    Lakename_data = json.load(Lakenames_file)
-    for lake_name in Lakename_data:
+    Texas_lake_data = json.load(Texas_lakes_file)
+    lake_extras = ["Lake", "Lagoon", "Sea", "Pond"]
+    for lake_name in Texas_lake_data:
         lakes_list.append(lake_name["lake"])
-    Lakenames_file.close()
+        lake_title = randint(0, len(lake_extras) - 1)
+        if lake_title:
+            lakes_list[-1] = lakes_list[-1] + " " + lake_extras[lake_title]
+        else:
+            lakes_list[-1] = lake_extras[lake_title] + " " + lakes_list[-1]
+    Texas_lakes_file.close()
+
+    World_lake_data = json.load(World_lakes_file)
+    for lake_name in World_lake_data:
+        lakes_list.append(lake_name["lake_name"])
+    World_lakes_file.close()
 
     print(lakes_list)
     print(surnames_list)
     print(female_names_list)
     print(male_names_list)
+
+
+def run_spiders():
+    process = 0
+    if not Path('babynames/Surnames.json').is_file():
+        print("crawling for surnames...")
+        process = CrawlerProcess(settings={
+            "FEEDS": {
+                "babynames/Surnames.json": {"format": "json"},
+            },
+        })
+        process.crawl(surnames_spider.SurnamesSpider)
+
+    if not Path('babynames/Names.json').is_file():
+        print("crawling for names...")
+        process = CrawlerProcess(settings={
+            "FEEDS": {
+                "babynames/Names.json": {"format": "json"},
+            },
+        })
+        process.crawl(names_spider.NamesSpider)
+
+    if not Path('babynames/Lake_Names.json').is_file():
+        print("crawling for Texas-lakes...")
+        process = CrawlerProcess(settings={
+            "FEEDS": {
+                "babynames/Lake_Names.json": {"format": "json"},
+            },
+        })
+        process.crawl(lakes_spider.LakesSpider)
+
+    if not Path('babynames/Lakes_All.json').is_file():
+        print("crawling for all lakes...")
+        process = CrawlerProcess(settings={
+            "FEEDS": {
+                "babynames/Lakes_All.json": {"format": "json"},
+            },
+        })
+        process.crawl(lakesall_spider.LakesAllSpider)
+
+    if process:
+        process.start()
 
 
 if __name__ == '__main__':
