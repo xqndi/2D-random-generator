@@ -1,5 +1,6 @@
 import json
-from babynames.babynames.spiders import surnames_spider, names_spider, lakes_spider, lakesall_spider
+from babynames.babynames.spiders import surnames_spider,\
+    names_spider, lakes_spider, lakesall_spider, mountains_spider
 from scrapy.crawler import CrawlerProcess
 from pathlib import Path
 from random import randint
@@ -20,8 +21,10 @@ def main():
     female_names_list = []
     lakes_list = []
     lake_dict = {}
+    mountains_list = []
+    mountain_dict = {}
 
-    parse_json_files(surnames_list, male_names_list, female_names_list, lakes_list)
+    parse_json_files(surnames_list, male_names_list, female_names_list, lakes_list, mountains_list)
 
     window_map = [[0 for col in range(WINDOW_WIDTH)]
                   for row in range(WINDOW_HEIGHT)]
@@ -29,9 +32,10 @@ def main():
     win = GraphWin("gen", WINDOW_WIDTH, WINDOW_HEIGHT)
     win.setBackground("green")
 
+    Mountain.manage_mountains(window_map, 3, win, 80, mountain_dict, mountains_list)
     RiverPart.manage_river(window_map, 9, win, 75, lake_dict, lakes_list)
     Tree.generate_trees(window_map, 100000, win, 20)
-    House.generate_houses(window_map, 25000, win, 20, house_list,
+    House.generate_houses(window_map, 20000, win, 20, house_list,
                           surnames_list, male_names_list, female_names_list)
 
     while True:
@@ -41,6 +45,7 @@ def main():
         print(window_map[int(mouse.getY())][int(mouse.getX())])
         House.check_houses(house_list, mouse, win)
         RiverPart.check_lakes(mouse, window_map, win, lake_dict)
+        Mountain.check_mountains(mouse, window_map, win, mountain_dict)
 
 
 class Family:
@@ -59,7 +64,7 @@ class Family:
     def create_female(self, female_names_list):
         valid_name = False
         while not valid_name:
-            index = randint(0, 4)
+            index = randint(0, len(female_names_list) - 1)
             counter = self.female_index_list.count(index)
 
             if counter == 1:
@@ -78,7 +83,7 @@ class Family:
     def create_male(self, male_names_list):
         valid_name = False
         while not valid_name:
-            index = randint(0, 4)
+            index = randint(0, len(male_names_list) - 1)
             counter = self.male_index_list.count(index)
 
             if counter == 1:
@@ -169,7 +174,7 @@ class Tree(Point):
     def generate_trees(win_map, nr_trees, window, neighbor_size):
         for tree in range(nr_trees):
             while True:
-                temp_tree = Tree(randint(0, WINDOW_WIDTH - 10), randint(0, WINDOW_HEIGHT - 10))
+                temp_tree = Tree(randint(0, WINDOW_WIDTH - 2), randint(0, WINDOW_HEIGHT - 2))
                 temp_tree.distance_to_center()
                 if temp_tree.dist_center < randint(50, WINDOW_HEIGHT - 100):
                     break
@@ -248,8 +253,8 @@ class House(Rectangle):
                         surnames_list, male_names_list, female_names_list):
         for house in range(nr_houses):
             while True:
-                temp_house = House(Point(randint(0, WINDOW_WIDTH - 10),
-                                         randint(0, WINDOW_HEIGHT - 10)),
+                temp_house = House(Point(randint(0, WINDOW_WIDTH - 2),
+                                         randint(0, WINDOW_HEIGHT - 2)),
                                    surnames_list, male_names_list, female_names_list)
                 temp_house.count_neighbors_(win_map, neighbor_size)
 
@@ -340,10 +345,121 @@ class Lake(Circle):
         for attempt in range(nr_iterations):
             if randint(0, 2):
                 continue
-            temp_lake = Lake(Point(randint(0, WINDOW_WIDTH - 10),
-                                   randint(0, WINDOW_HEIGHT - 10)), randint(40, 100))
+            temp_lake = Lake(Point(randint(0, WINDOW_WIDTH - 2),
+                                   randint(0, WINDOW_HEIGHT - 2)), randint(40, 100))
             if not temp_lake.update_map_(win_map, window):
                 continue
+
+
+class Mountain(Rectangle):
+    def __init__(self, upper_corner, size):
+        self.size = size
+        Rectangle.__init__(self, upper_corner, Point(upper_corner.getX() + self.size,
+                                                     upper_corner.getY() + self.size))
+        self.setFill("gray")
+        self.low_x = int(self.getP1().getX())
+        self.low_y = int(self.getP1().getY())
+        self.high_x = int(self.getP2().getX())
+        self.high_y = int(self.getP2().getY())
+
+    def update_map(self, win_map, window, key):
+        for row_y in range(self.low_y - 1, self.high_y + 1):
+            for col_x in range(self.low_x - 1, self.high_x + 1):
+                if not (0 <= row_y <= WINDOW_HEIGHT - 1):
+                    return False
+                if not (0 <= col_x <= WINDOW_WIDTH - 1):
+                    return False
+                if win_map[row_y][col_x]:
+                    return False
+
+        self.draw(window)
+
+        for row_y in range(self.low_y - 1, self.high_y + 1):
+            for col_x in range(self.low_x - 1, self.high_x + 1):
+                win_map[row_y][col_x] = key
+        return True
+
+    def fill(self, graph_win):
+        inner_dist = 3
+        while True:
+            inner_p1_x = self.getP1().getX() + inner_dist
+            inner_p1_y = self.getP1().getY() + inner_dist
+            inner_p2_x = self.getP2().getX() - inner_dist
+            inner_p2_y = self.getP2().getY() - inner_dist
+
+            if (inner_p2_x - inner_p1_x <= 3) or (inner_p2_y - inner_p1_y <= 3):
+                break
+
+            temp_rec = Rectangle(Point(inner_p1_x, inner_p1_y),
+                                 Point(inner_p2_x, inner_p2_y))
+            temp_rec.draw(graph_win)
+            if inner_dist % 6:
+                temp_rec.setFill("dimgrey")
+            else:
+                temp_rec.setFill("gray")
+
+            inner_dist += 3
+
+    @staticmethod
+    def generate_mountains(win_map, window, key):
+        while True:
+            temp_size = 5 * randint(8, 50)
+            temp_mountain = Mountain(Point(randint(0, WINDOW_WIDTH - 2),
+                                           randint(0, WINDOW_HEIGHT - 2)), temp_size)
+            if temp_mountain.update_map(win_map, window, key):
+                temp_mountain.fill(window)
+                return
+
+    @staticmethod
+    def manage_mountains(win_map, nr_iterations, window, spawn_rate, mountain_dict, mountains_list):
+        used_mountain_indices = []
+
+        for iteration in range(nr_iterations):
+            if spawn_rate < randint(0, 100):
+                continue
+            Mountain.create_mountain_name(- (iteration + 1), used_mountain_indices,
+                                          mountain_dict, mountains_list)
+            Mountain.generate_mountains(win_map, window, - (iteration + 1))
+
+        print(used_mountain_indices)
+
+    @staticmethod
+    def create_mountain_name(key, used_mountain_indices, mountain_dict, mountains_list):
+        extras = ["Highlands", "Hillside", "Peaks", "Rise", "Heights"]
+        while True:
+            new_index = randint(0, len(mountains_list) - 1)
+            if new_index not in used_mountain_indices:
+                break
+
+        name = mountains_list[new_index]
+        if len(name.split()) == 1:
+            name = "The" + " " + name + " " + extras[randint(0, len(extras) - 1)]
+            print("-----------------")
+            print(name)
+        used_mountain_indices.append(new_index)
+
+        mountain_dict[str(key)] = name
+        print(mountain_dict[str(key)])
+
+    @staticmethod
+    def check_mountains(mouse_point, win_map, graph_win, mountain_dict):
+        key = win_map[int(mouse_point.getY())][int(mouse_point.getX())]
+        print("key(mountain): " + str(key))
+
+        if key >= 0:
+            return
+        text = Entry(Point(150, 15), 32)
+
+        text.setText(mountain_dict[str(key)])
+        text.setStyle("italic")
+        text.setFill("mediumorchid")
+        text.draw(graph_win)
+
+        # keep displaying while mouse is not not clicked
+        while not graph_win.getMouse():
+            continue
+
+        text.undraw()
 
 
 class RiverPart(Rectangle):
@@ -390,8 +506,8 @@ class RiverPart(Rectangle):
 
     @staticmethod
     def generate_river(win_map, window, map_key):
-        river = RiverPart(Point(randint(0, WINDOW_WIDTH - 10),
-                                randint(0, WINDOW_HEIGHT - 10)), map_key)
+        river = RiverPart(Point(randint(0, WINDOW_WIDTH - 2),
+                                randint(0, WINDOW_HEIGHT - 2)), map_key)
         river.update_map_(win_map, window)
 
         last_corner = river.clone().getP1()
@@ -463,12 +579,13 @@ class RiverPart(Rectangle):
         text.undraw()
 
 
-def parse_json_files(surnames_list, male_names_list, female_names_list, lakes_list):
+def parse_json_files(surnames_list, male_names_list, female_names_list, lakes_list, mountains_list):
     run_spiders()
     Surnames_file = open('babynames/Surnames.json')
     Babynames_file = open('babynames/Names.json')
     Texas_lakes_file = open('babynames/Lake_Names.json')
     World_lakes_file = open('babynames/Lakes_All.json')
+    Mountains_file = open('babynames/Mountains.json')
 
     Surname_data = json.load(Surnames_file)
 
@@ -480,13 +597,12 @@ def parse_json_files(surnames_list, male_names_list, female_names_list, lakes_li
 
     name_index = 0
     for name in Babyname_data:
-        if name_index % 2 == 0:
+        if name_index < 1000:
             male_names_list.append(name["name"])
         else:
             female_names_list.append(name["name"])
-
         name_index += 1
-    male_names_list.pop()
+
     Babynames_file.close()
 
     Texas_lake_data = json.load(Texas_lakes_file)
@@ -505,10 +621,16 @@ def parse_json_files(surnames_list, male_names_list, female_names_list, lakes_li
         lakes_list.append(lake_name["lake_name"])
     World_lakes_file.close()
 
+    Mountains_data = json.load(Mountains_file)
+    for mountain_name in Mountains_data:
+        mountains_list.append(mountain_name["mountain"])
+    Mountains_file.close()
+
     print(lakes_list)
     print(surnames_list)
     print(female_names_list)
     print(male_names_list)
+    print(mountains_list)
 
 
 def run_spiders():
@@ -548,6 +670,15 @@ def run_spiders():
             },
         })
         process.crawl(lakesall_spider.LakesAllSpider)
+
+    if not Path('babynames/Mountains.json').is_file():
+        print("crawling for mountains...")
+        process = CrawlerProcess(settings={
+            "FEEDS": {
+                "babynames/Mountains.json": {"format": "json"},
+            },
+        })
+        process.crawl(mountains_spider.MountainsSpider)
 
     if process:
         process.start()
