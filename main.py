@@ -1,9 +1,9 @@
 import json
 from babynames.babynames.spiders import surnames_spider,\
-    names_spider, lakes_spider, lakesall_spider, mountains_spider
+    names_spider, lakes_spider, lakesall_spider, mountains_spider, canyons_spider
 from scrapy.crawler import CrawlerProcess
 from pathlib import Path
-from random import randint
+from random import randint, gauss
 from graphics import *
 
 
@@ -23,18 +23,22 @@ def main():
     lake_dict = {}
     mountains_list = []
     mountain_dict = {}
+    canyons_list = []
+    canyons_dict = {}
 
-    parse_json_files(surnames_list, male_names_list, female_names_list, lakes_list, mountains_list)
+    parse_json_files(surnames_list, male_names_list, female_names_list,
+                     lakes_list, mountains_list, canyons_list)
 
     window_map = [[0 for col in range(WINDOW_WIDTH)]
                   for row in range(WINDOW_HEIGHT)]
 
     win = GraphWin("gen", WINDOW_WIDTH, WINDOW_HEIGHT)
-    win.setBackground("green")
+    win.setBackground("seagreen")
 
-    Mountain.manage_mountains(window_map, 3, win, 80, mountain_dict, mountains_list)
-    RiverPart.manage_river(window_map, 9, win, 75, lake_dict, lakes_list)
-    Tree.generate_trees(window_map, 100000, win, 20)
+    CanyonPart.manage_canyon(window_map, 3, win, 50, canyons_dict, canyons_list)
+    Mountain.manage_mountains(window_map, 7, win, 80, mountain_dict, mountains_list)
+    RiverPart.manage_river(window_map, 16, win, 75, lake_dict, lakes_list)
+    Tree.generate_trees(window_map, 200000, win, 20)
     House.generate_houses(window_map, 20000, win, 20, house_list,
                           surnames_list, male_names_list, female_names_list)
 
@@ -46,6 +50,7 @@ def main():
         House.check_houses(house_list, mouse, win)
         RiverPart.check_lakes(mouse, window_map, win, lake_dict)
         Mountain.check_mountains(mouse, window_map, win, mountain_dict)
+        CanyonPart.check_canyons(mouse, window_map, win, canyons_dict)
 
 
 class Family:
@@ -130,7 +135,7 @@ class Tree(Point):
         self.dist_center = -1
 
         Point.__init__(self, x_pos, y_pos)
-        self.setFill("greenyellow")
+        self.setFill("darkgreen")
         self.temp_y = int(self.getY())
         self.temp_x = int(self.getX())
 
@@ -462,6 +467,174 @@ class Mountain(Rectangle):
         text.undraw()
 
 
+class CanyonPart(Rectangle):
+    def __init__(self, top_corner, key):
+        self.size = 20
+        self.map_key = key
+        self.inside_win = True
+        Rectangle.__init__(self, top_corner, Point(top_corner.getX() + self.size,
+                                                   top_corner.getY() + self.size))
+        self.setOutline("sienna")
+        self.setFill("peru")
+
+    def update_map_(self, win_map, window):
+        low_x = int(self.getP1().getX())
+        low_y = int(self.getP1().getY())
+        high_x = int(self.getP2().getX())
+        high_y = int(self.getP2().getY())
+
+        is_valid = True
+
+        for row_y in range(low_y, high_y):
+            for col_x in range(low_x, high_x):
+                if not (0 <= row_y <= WINDOW_HEIGHT - 1):
+                    continue
+                if not (0 <= col_x <= WINDOW_WIDTH - 1):
+                    continue
+                if win_map[row_y][col_x] and (win_map[row_y][col_x] != self.map_key):
+                    is_valid = False
+
+        if not is_valid:
+            return False
+
+        self.draw(window)
+
+        for row_y in range(low_y, high_y):
+            for col_x in range(low_x, high_x):
+                if not (0 <= row_y <= WINDOW_HEIGHT - 1):
+                    self.inside_win = False
+                    break
+                if not (0 <= col_x <= WINDOW_WIDTH - 1):
+                    self.inside_win = False
+                    break
+                win_map[row_y][col_x] = self.map_key
+        return True
+
+    @staticmethod
+    def generate_canyon(win_map, window, map_key, general_direction,
+                        general_linearity, starting_point):
+        canyon = CanyonPart(starting_point, map_key)
+        canyon.update_map_(win_map, window)
+
+        last_corner = canyon.clone().getP1()
+        last_direction = 1
+        counter = 0
+        while True:
+            temp_canyon = -1
+            if counter < 3:
+                direction = general_direction
+            elif randint(1, 10) < general_linearity:
+                direction = general_direction
+            elif randint(0, 1):
+                if last_direction < 4:
+                    direction = last_direction + 1
+                else:
+                    direction = last_direction - 3
+            else:
+                if last_direction > 1:
+                    direction = last_direction - 1
+                else:
+                    direction = last_direction + 3
+
+            if direction == 1:
+                temp_canyon = CanyonPart(Point(last_corner.getX() + 20,
+                                               last_corner.getY()), map_key)
+            elif direction == 2:
+                temp_canyon = CanyonPart(Point(last_corner.getX(),
+                                               last_corner.getY() + 20), map_key)
+            elif direction == 3:
+                temp_canyon = CanyonPart(Point(last_corner.getX() - 20,
+                                               last_corner.getY()), map_key)
+            elif direction == 4:
+                temp_canyon = CanyonPart(Point(last_corner.getX(),
+                                               last_corner.getY() - 20), map_key)
+
+            if not temp_canyon.update_map_(win_map, window):
+                break
+            last_corner = temp_canyon.clone().getP1()
+            last_direction = direction
+            counter += 1
+            if not temp_canyon.inside_win:
+                break
+
+    @staticmethod
+    def manage_canyon(win_map, nr_iterations, window, spawn_rate, canyon_dict, canyons_list):
+        used_canyon_indices = []
+
+        for iteration in range(nr_iterations):
+            if spawn_rate < randint(0, 100):
+                continue
+
+            starting_edge = randint(1, 4)
+
+            if starting_edge == 1:
+                x_pos = 0
+                raw_y_pos = randint(20, WINDOW_HEIGHT - 20)
+                y_pos = my_round(raw_y_pos, WINDOW_HEIGHT - 20)
+                general_dir = 1
+            elif starting_edge == 2:
+                raw_x_pos = randint(20, WINDOW_WIDTH - 20)
+                x_pos = my_round(raw_x_pos, WINDOW_WIDTH - 20)
+                y_pos = 0
+                general_dir = 2
+            elif starting_edge == 3:
+                x_pos = WINDOW_WIDTH
+                raw_y_pos = randint(20, WINDOW_HEIGHT - 20)
+                y_pos = my_round(raw_y_pos, WINDOW_HEIGHT - 20)
+                general_dir = 3
+            else:
+                raw_x_pos = randint(20, WINDOW_WIDTH - 20)
+                x_pos = my_round(raw_x_pos, WINDOW_WIDTH - 20)
+                y_pos = WINDOW_HEIGHT
+                general_dir = 4
+
+            linearity = int(gauss(5, 2))
+            if linearity > 9:
+                linearity = 9
+            elif linearity < 1:
+                linearity = 1
+
+            CanyonPart.create_canyon_name(iteration + 100, used_canyon_indices,
+                                          canyon_dict, canyons_list)
+            CanyonPart.generate_canyon(win_map, window, iteration + 100,
+                                       general_dir, linearity, Point(x_pos, y_pos))
+
+        print(used_canyon_indices)
+
+    @staticmethod
+    def create_canyon_name(key, used_canyon_indices, canyon_dict, canyons_list):
+        while True:
+            new_index = randint(0, len(canyons_list) - 1)
+            if new_index not in used_canyon_indices:
+                break
+
+        name = canyons_list[new_index]
+        used_canyon_indices.append(new_index)
+
+        canyon_dict[str(key)] = name
+        print(canyon_dict[str(key)])
+
+    @staticmethod
+    def check_canyons(mouse_point, win_map, graph_win, canyon_dict):
+        key = win_map[int(mouse_point.getY())][int(mouse_point.getX())]
+        print("key(can): " + str(key))
+
+        if key < 100:
+            return
+        text = Entry(Point(118, 15), 25)
+
+        text.setText(canyon_dict[str(key)])
+        text.setStyle("italic")
+        text.setFill("orange")
+        text.draw(graph_win)
+
+        # keep displaying while mouse is not not clicked
+        while not graph_win.getMouse():
+            continue
+
+        text.undraw()
+
+
 class RiverPart(Rectangle):
     def __init__(self, top_corner, key):
         self.size = 10
@@ -469,7 +642,7 @@ class RiverPart(Rectangle):
         self.inside_win = True
         Rectangle.__init__(self, top_corner, Point(top_corner.getX() + self.size,
                                                    top_corner.getY() + self.size))
-        self.setOutline("blue")
+        # self.setOutline("blue")
         self.setFill("blue")
 
     def update_map_(self, win_map, window):
@@ -498,10 +671,10 @@ class RiverPart(Rectangle):
             for col_x in range(low_x, high_x + 1):
                 if not (0 <= row_y <= WINDOW_HEIGHT - 1):
                     self.inside_win = False
-                    break
+                    continue
                 if not (0 <= col_x <= WINDOW_WIDTH - 1):
                     self.inside_win = False
-                    break
+                    continue
                 win_map[row_y][col_x] = self.map_key
 
     @staticmethod
@@ -563,7 +736,7 @@ class RiverPart(Rectangle):
         key = win_map[int(mouse_point.getY())][int(mouse_point.getX())]
         print("key: " + str(key))
 
-        if key < 4:
+        if (key < 4) or (key >= 100):
             return
         text = Entry(Point(118, 15), 25)
 
@@ -579,22 +752,23 @@ class RiverPart(Rectangle):
         text.undraw()
 
 
-def parse_json_files(surnames_list, male_names_list, female_names_list, lakes_list, mountains_list):
+def parse_json_files(surnames_list, male_names_list, female_names_list,
+                     lakes_list, mountains_list, canyons_list):
     run_spiders()
+
     Surnames_file = open('babynames/Surnames.json')
     Babynames_file = open('babynames/Names.json')
     Texas_lakes_file = open('babynames/Lake_Names.json')
     World_lakes_file = open('babynames/Lakes_All.json')
     Mountains_file = open('babynames/Mountains.json')
+    Canyons_file = open('babynames/Canyons.json')
 
     Surname_data = json.load(Surnames_file)
-
     for name in Surname_data:
         surnames_list.append(name["surname"])
     Surnames_file.close()
 
     Babyname_data = json.load(Babynames_file)
-
     name_index = 0
     for name in Babyname_data:
         if name_index < 1000:
@@ -602,7 +776,6 @@ def parse_json_files(surnames_list, male_names_list, female_names_list, lakes_li
         else:
             female_names_list.append(name["name"])
         name_index += 1
-
     Babynames_file.close()
 
     Texas_lake_data = json.load(Texas_lakes_file)
@@ -626,11 +799,17 @@ def parse_json_files(surnames_list, male_names_list, female_names_list, lakes_li
         mountains_list.append(mountain_name["mountain"])
     Mountains_file.close()
 
+    Canyons_data = json.load(Canyons_file)
+    for canyon_name in Canyons_data:
+        canyons_list.append(canyon_name["canyon"])
+    Canyons_file.close()
+
     print(lakes_list)
     print(surnames_list)
     print(female_names_list)
     print(male_names_list)
     print(mountains_list)
+    print(canyons_list)
 
 
 def run_spiders():
@@ -680,8 +859,26 @@ def run_spiders():
         })
         process.crawl(mountains_spider.MountainsSpider)
 
+    if not Path('babynames/Canyons.json').is_file():
+        print("crawling for canyons...")
+        process = CrawlerProcess(settings={
+            "FEEDS": {
+                "babynames/Canyons.json": {"format": "json"},
+            },
+        })
+        process.crawl(canyons_spider.CanyonsSpider)
+
     if process:
         process.start()
+
+
+def my_round(x, upper_limit, base=20):
+    val = base * round(x/base)
+
+    if val > upper_limit:
+        val = upper_limit
+
+    return val
 
 
 if __name__ == '__main__':
