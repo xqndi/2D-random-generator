@@ -1,4 +1,5 @@
 import json
+import mysql.connector
 from babynames.babynames.spiders import surnames_spider,\
     names_spider, lakes_spider, lakesall_spider, mountains_spider, canyons_spider
 from scrapy.crawler import CrawlerProcess
@@ -13,6 +14,8 @@ WINDOW_HEIGHT = 720
 X_CENTER = WINDOW_WIDTH / 2
 Y_CENTER = WINDOW_HEIGHT / 2
 
+DATABASE_NAME = "names_database"
+
 
 def main():
     house_list = []
@@ -26,8 +29,20 @@ def main():
     canyons_list = []
     canyons_dict = {}
 
+    database = 0
+    cursor = 0
+    validate_database(database, cursor)
+    database = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="abcd",
+        database=DATABASE_NAME
+    )
+    cursor = database.cursor()
     parse_json_files(surnames_list, male_names_list, female_names_list,
-                     lakes_list, mountains_list, canyons_list)
+                     lakes_list, mountains_list, canyons_list, database, cursor)
+
+    cursor.execute("DROP DATABASE" + " " + DATABASE_NAME)
 
     window_map = [[0 for col in range(WINDOW_WIDTH)]
                   for row in range(WINDOW_HEIGHT)]
@@ -51,6 +66,51 @@ def main():
         RiverPart.check_lakes(mouse, window_map, win, lake_dict)
         Mountain.check_mountains(mouse, window_map, win, mountain_dict)
         CanyonPart.check_canyons(mouse, window_map, win, canyons_dict)
+
+
+def fill_database(my_database, my_cursor, table_name, json_key, json_file):
+    my_cursor.execute("CREATE TABLE " + table_name +
+                      " (id INT AUTO_INCREMENT PRIMARY KEY, placeholder VARCHAR(32), name VARCHAR(128))")
+    prep_list = []
+    for element in json_file:
+        prep_list.append(("name", element[json_key]))
+
+    print(prep_list)
+    sql = "INSERT INTO " + table_name + " (placeholder, name) VALUES (%s, %s)"
+    my_cursor.executemany(sql, prep_list)
+    my_database.commit()
+
+    print(my_cursor.rowcount, "record inserted.")
+    my_cursor.execute("SELECT * FROM " + table_name)
+
+    my_result = my_cursor.fetchall()
+
+    for x in my_result:
+        print(x)
+
+
+def validate_database(my_database, my_cursor):
+    new_base_flag = True
+
+    print(my_database)
+    print(my_cursor)
+    my_database = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="abcd"
+    )
+
+    my_cursor = my_database.cursor()
+    my_cursor.execute("SHOW DATABASES")
+
+    for database_name in my_cursor:
+        print(database_name)
+        if DATABASE_NAME in database_name:
+            new_base_flag = False
+
+    if new_base_flag:
+        my_cursor.execute("CREATE DATABASE" + " " + DATABASE_NAME)
+        print("new database created")
 
 
 class Family:
@@ -753,7 +813,7 @@ class RiverPart(Rectangle):
 
 
 def parse_json_files(surnames_list, male_names_list, female_names_list,
-                     lakes_list, mountains_list, canyons_list):
+                     lakes_list, mountains_list, canyons_list, my_database, my_cursor):
     run_spiders()
 
     Surnames_file = open('babynames/Surnames.json')
@@ -764,45 +824,77 @@ def parse_json_files(surnames_list, male_names_list, female_names_list,
     Canyons_file = open('babynames/Canyons.json')
 
     Surname_data = json.load(Surnames_file)
-    for name in Surname_data:
-        surnames_list.append(name["surname"])
+    fill_database(my_database, my_cursor, "surnames", "surname", Surname_data)
+    print(Surname_data)
     Surnames_file.close()
 
     Babyname_data = json.load(Babynames_file)
-    name_index = 0
-    for name in Babyname_data:
-        if name_index < 1000:
-            male_names_list.append(name["name"])
-        else:
-            female_names_list.append(name["name"])
-        name_index += 1
+    fill_database(my_database, my_cursor, "males", "name", Babyname_data[:999])
+    fill_database(my_database, my_cursor, "females", "name", Babyname_data[1000:])
     Babynames_file.close()
 
     Texas_lake_data = json.load(Texas_lakes_file)
+    fill_database(my_database, my_cursor, "texas_lakes", "lake", Texas_lake_data)
+    Texas_lakes_file.close()
+
+    World_lake_data = json.load(World_lakes_file)
+    fill_database(my_database, my_cursor, "world_lakes", "lake_name", World_lake_data)
+    World_lakes_file.close()
+
+    Mountains_data = json.load(Mountains_file)
+    fill_database(my_database, my_cursor, "mountains", "mountain", Mountains_data)
+    Mountains_file.close()
+
+    Canyons_data = json.load(Canyons_file)
+    fill_database(my_database, my_cursor, "canyons", "canyon", Canyons_data)
+    Canyons_file.close()
+
+    fill_lists(surnames_list, male_names_list, female_names_list,
+               lakes_list, mountains_list, canyons_list, my_cursor)
+
+
+def fill_lists(surnames_list, male_names_list, female_names_list,
+               lakes_list, mountains_list, canyons_list, my_cursor):
+    my_cursor.execute("SELECT name FROM surnames")
+    my_result = my_cursor.fetchall()
+    for element in my_result:
+        surnames_list.append(element[0])
+
+    my_cursor.execute("SELECT name FROM males")
+    my_result = my_cursor.fetchall()
+    for element in my_result:
+        male_names_list.append(element[0])
+
+    my_cursor.execute("SELECT name FROM females")
+    my_result = my_cursor.fetchall()
+    for element in my_result:
+        female_names_list.append(element[0])
+
     lake_extras = ["Lake", "Lagoon", "Sea", "Pond"]
-    for lake_name in Texas_lake_data:
-        lakes_list.append(lake_name["lake"])
+    my_cursor.execute("SELECT name FROM texas_lakes")
+    my_result = my_cursor.fetchall()
+    for element in my_result:
+        lakes_list.append(element[0])
         lake_title = randint(0, len(lake_extras) - 1)
         if lake_title:
             lakes_list[-1] = lakes_list[-1] + " " + lake_extras[lake_title]
         else:
             lakes_list[-1] = lake_extras[lake_title] + " " + lakes_list[-1]
-    Texas_lakes_file.close()
 
-    World_lake_data = json.load(World_lakes_file)
-    for lake_name in World_lake_data:
-        lakes_list.append(lake_name["lake_name"])
-    World_lakes_file.close()
+    my_cursor.execute("SELECT name FROM world_lakes")
+    my_result = my_cursor.fetchall()
+    for element in my_result:
+        lakes_list.append(element[0])
 
-    Mountains_data = json.load(Mountains_file)
-    for mountain_name in Mountains_data:
-        mountains_list.append(mountain_name["mountain"])
-    Mountains_file.close()
+    my_cursor.execute("SELECT name FROM mountains")
+    my_result = my_cursor.fetchall()
+    for element in my_result:
+        mountains_list.append(element[0])
 
-    Canyons_data = json.load(Canyons_file)
-    for canyon_name in Canyons_data:
-        canyons_list.append(canyon_name["canyon"])
-    Canyons_file.close()
+    my_cursor.execute("SELECT name FROM canyons")
+    my_result = my_cursor.fetchall()
+    for element in my_result:
+        canyons_list.append(element[0])
 
     print(lakes_list)
     print(surnames_list)
